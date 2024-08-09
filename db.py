@@ -8,7 +8,8 @@ def init_db():
     cursor = connection.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY,
+            user_id TEXT UNIQUE,
             name TEXT,
             phone TEXT,
             company TEXT,
@@ -69,5 +70,11 @@ def get_user(user_id):
         }
     return None
 
+
 def is_user_registered(user_id):
-    return get_user(user_id) is not None
+    connection = sqlite3.connect(DB_PATH)
+    cursor = connection.cursor()
+    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+    user = cursor.fetchone()
+    connection.close()
+    return user is not None

@@ -5,10 +5,13 @@ from telegram.ext import (
     CallbackQueryHandler, ConversationHandler, filters, ContextTypes
 )
 from handlers import (
-    start, register, input_password, input_name,
+    register, input_password, input_name,
     input_phone, input_company, input_email, show_main_menu,
-    input_vehicle_brand, input_guest_status, input_request_date,
-    confirm_request, handle_vopros, order_vehicle
+    input_vehicle_brand, order_vehicle, INPUT_VEHICLE_BRAND,
+    MAIN_MENU, ORDER_VEHICLE, REGISTER, INPUT_PASSWORD,
+    INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL,
+    input_vehicle_purpose, confirm_order, cancel_order,
+    INPUT_VEHICLE_PURPOSE, CONFIRM_ORDER, order_vehicle_brand
 )
 from db import init_db, is_user_registered, add_user
 
@@ -20,10 +23,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Состояния для ConversationHandler
-REGISTER, INPUT_PASSWORD, INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL, MAIN_MENU, ORDER_VEHICLE, CONFIRM_ORDER = range(9)
+# REGISTER, INPUT_PASSWORD, INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL, MAIN_MENU, ORDER_VEHICLE, CONFIRM_ORDER, INPUT_VEHICLE_BRAND = range(10)
 
-# Проверка регистрации в стартовой функции
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if is_user_registered(user_id):
         await show_main_menu(update, context)
@@ -35,25 +37,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main() -> None:
     application = Application.builder().token("7364780446:AAFHddC3AfzoG-1SI8-hfwTWKZjuc8YWZ6A").build()
 
-    conversation_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start_command)],
         states={
-            MAIN_MENU: [
-                CallbackQueryHandler(order_vehicle, pattern='ORDER_VEHICLE'),
-                CallbackQueryHandler(handle_vopros, pattern='vopros')
-            ],
-            ORDER_VEHICLE: [
-                CallbackQueryHandler(order_vehicle, pattern='order_vehicle'),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, input_vehicle_brand),
-                CallbackQueryHandler(input_guest_status, pattern='guest_.+'),
-                CallbackQueryHandler(input_request_date, pattern='(today|tomorrow|day_after_tomorrow)'),
-                CallbackQueryHandler(confirm_request, pattern='confirm_.+')
-            ],
+            REGISTER: [CommandHandler('register', register)],
+            INPUT_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_password)],
+            INPUT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_name)],
+            INPUT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_phone)],
+            INPUT_COMPANY: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_company)],
+            INPUT_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_email)],
+            MAIN_MENU: [CallbackQueryHandler(order_vehicle, pattern='order_vehicle')],
+            INPUT_VEHICLE_BRAND: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_vehicle_brand)],
+            ORDER_VEHICLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, order_vehicle_brand)],
+            INPUT_VEHICLE_PURPOSE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_vehicle_purpose)],
+            CONFIRM_ORDER: [
+                CallbackQueryHandler(confirm_order, pattern='confirm'),
+                CallbackQueryHandler(cancel_order, pattern='cancel')
+            ]
         },
-        fallbacks=[CommandHandler('start', start)],
+        fallbacks=[CommandHandler('start', start_command)]
     )
 
-    application.add_handler(conversation_handler)
+    application.add_handler(conv_handler)
     init_db()
     application.run_polling()
 

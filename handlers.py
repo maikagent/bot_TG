@@ -1,142 +1,61 @@
-
-from db import is_user_registered, add_user, add_request
-import datetime
 import logging
-from telegram.ext import ContextTypes, ConversationHandler
-import re
-from datetime import date, timedelta, datetime
-import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackContext
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ConversationHandler, filters, ContextTypes
+)
+from handlers import (
+    register, input_password, input_name,
+    input_phone, input_company, input_email, show_main_menu,
+    input_vehicle_brand, order_vehicle, INPUT_VEHICLE_BRAND,
+    MAIN_MENU, ORDER_VEHICLE, REGISTER, INPUT_PASSWORD,
+    INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL,
+    input_vehicle_purpose, confirm_order,
+    INPUT_VEHICLE_PURPOSE, CONFIRM_ORDER, order_vehicle_brand
+)
+from db import init_db, is_user_registered, add_user
 
-
-logging.basicConfig(level=logging.INFO)
+# Логирование для отладки
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-REGISTER, INPUT_PASSWORD, INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL, MAIN_MENU, INPUT_VEHICLE_BRAND, ORDER_VEHICLE, CONFIRM_ORDER, INPUT_VEHICLE_PURPOSE, vehicle_purpose = range(12)
-VALID_PASSWORD = "123"
-DB_PATH = 'requests.db'
 
-
-
-async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if is_user_registered(user_id):
         await show_main_menu(update, context)
         return MAIN_MENU
     else:
-        await update.message.reply_text('Введите пароль для регистрации:')
-        return INPUT_PASSWORD
+        await update.message.reply_text("Привет! Нажмите /register для регистрации.")
+        return REGISTER
 
-async def input_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == VALID_PASSWORD:
-        await update.message.reply_text('Пароль верный. Введите ваше имя:')
-        return INPUT_NAME
-    else:
-        await update.message.reply_text('Пароль неверный. Попробуйте еще раз:')
-        return INPUT_PASSWORD
+def main() -> None:
+    application = Application.builder().token("7364780446:AAFHddC3AfzoG-1SI8-hfwTWKZjuc8YWZ6A").build()
 
-async def input_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_id'] = update.message.from_user.id
-    context.user_data['name'] = update.message.text
-    await update.message.reply_text('Введите ваш номер телефона:')
-    return INPUT_PHONE
-
-async def input_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['phone'] = update.message.text
-    await update.message.reply_text('Введите вашу компанию:')
-    return INPUT_COMPANY
-
-async def input_company(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['company'] = update.message.text
-    await update.message.reply_text('Введите ваш email:')
-    return INPUT_EMAIL
-
-async def input_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['email'] = update.message.text
-    user_id = context.user_data['user_id']
-    name = context.user_data['name']
-    phone = context.user_data['phone']
-    company = context.user_data['company']
-    email = context.user_data['email']
-    if not is_user_registered(user_id):
-        add_user(user_id, name, phone, company, email)
-    await show_main_menu(update, context)
-    return MAIN_MENU
-
-async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Заказать пропуск на авто", callback_data='order_vehicle')],
-        [InlineKeyboardButton("Вопрос", callback_data='question')],
-        [InlineKeyboardButton("Изменить регистрационные данные", callback_data='edit_register_info')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    if update.message:
-        await update.message.reply_text(
-            text='Добро пожаловать на Винзавод - выберите кнопку ниже',
-            reply_markup=reply_markup
-        )
-    else:
-        await update.callback_query.message.reply_text(
-            text='Добро пожаловать на Винзавод - выберите кнопку ниже',
-            reply_markup=reply_markup
-        )
-    return MAIN_MENU
-
-async def order_vehicle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.callback_query.message.reply_text('Введите номер авто в формате X777XX77:')
-    return INPUT_VEHICLE_BRAND
-
-async def input_vehicle_brand(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not re.match(r'^[A-ZА-Я]\d{3}[A-ZА-Я]{2}\d{2,3}$', update.message.text):
-        await update.message.reply_text('Неправильный формат номера автомобиля. Попробуйте снова.')
-        return INPUT_VEHICLE_BRAND
-
-    context.user_data['vehicle_number'] = update.message.text
-    await update.message.reply_text('Введите марку авто:')
-    return ORDER_VEHICLE
-
-async def order_vehicle_brand(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['vehicle_brand'] = update.message.text
-    await update.message.reply_text('Введите цель заезда (Гость, Разгрузка):')
-    return INPUT_VEHICLE_PURPOSE
-
-async def input_vehicle_purpose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['vehicle_purpose'] = update.message.text
-    summary = (
-        f"Номер авто: {context.user_data['vehicle_number']}\n"
-        f"Марка авто: {context.user_data['vehicle_brand']}\n"
-        f"Цель заезда: {context.user_data['vehicle_purpose']}\n"
-        "Всё верно?"
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start_command)],
+        states={
+            REGISTER: [CommandHandler('register', register)],
+            INPUT_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_password)],
+            INPUT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_name)],
+            INPUT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_phone)],
+            INPUT_COMPANY: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_company)],
+            INPUT_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_email)],
+            MAIN_MENU: [CallbackQueryHandler(order_vehicle, pattern='order_vehicle')],
+            INPUT_VEHICLE_BRAND: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_vehicle_brand)],
+            ORDER_VEHICLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, order_vehicle_brand)],
+            INPUT_VEHICLE_PURPOSE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_vehicle_purpose)],
+            CONFIRM_ORDER: [CallbackQueryHandler(confirm_order, pattern='confirm'),]
+        },
+        fallbacks=[CommandHandler('start', start_command)]
     )
-    keyboard = [
-        [InlineKeyboardButton("Да", callback_data='confirm')],
-        [InlineKeyboardButton("Нет", callback_data='cancel')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(summary, reply_markup=reply_markup)
-    return CONFIRM_ORDER
 
+    application.add_handler(conv_handler)
+    init_db()
+    application.run_polling()
 
-async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()  # Подтверждаем получение callback-запроса
-
-    if query.data == 'confirm':
-        user_id = update.effective_user.id
-        vehicle_number = context.user_data['vehicle_number']
-        vehicle_brand = context.user_data['vehicle_brand']
-        vehicle_purpose = context.user_data['vehicle_purpose']
-        is_guest = context.user_data.get('is_guest', False)  # или другое значение по умолчанию
-        request_date = datetime.now()  # Или возьмите дату из ответа пользователя
-
-        # Вставляем данные в базу данных
-        add_request(user_id, vehicle_number, vehicle_brand, vehicle_purpose, is_guest, request_date)
-
-        await query.edit_message_text(text="Запрос принят и записан в базу данных. Введите /start для возврата в главное меню")
-    else:
-        await query.edit_message_text(text="Запрос был отменен.")
-
-    return ConversationHandler.END  # Завершаем разговор
-
-
+if __name__ == '__main__':
+    main()

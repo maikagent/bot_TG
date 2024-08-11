@@ -13,7 +13,7 @@ from telegram.ext import ContextTypes, CallbackContext
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-REGISTER, INPUT_PASSWORD, INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL, MAIN_MENU, INPUT_VEHICLE_BRAND, ORDER_VEHICLE, CONFIRM_ORDER, INPUT_VEHICLE_PURPOSE = range(11)
+REGISTER, INPUT_PASSWORD, INPUT_NAME, INPUT_PHONE, INPUT_COMPANY, INPUT_EMAIL, MAIN_MENU, INPUT_VEHICLE_BRAND, ORDER_VEHICLE, CONFIRM_ORDER, INPUT_VEHICLE_PURPOSE, vehicle_purpose = range(12)
 VALID_PASSWORD = "123"
 DB_PATH = 'requests.db'
 
@@ -126,30 +126,17 @@ async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         user_id = update.effective_user.id
         vehicle_number = context.user_data['vehicle_number']
         vehicle_brand = context.user_data['vehicle_brand']
+        vehicle_purpose = context.user_data['vehicle_purpose']
         is_guest = context.user_data.get('is_guest', False)  # или другое значение по умолчанию
         request_date = datetime.now()  # Или возьмите дату из ответа пользователя
 
         # Вставляем данные в базу данных
-        add_request(user_id, vehicle_number, vehicle_brand, is_guest, request_date)
+        add_request(user_id, vehicle_number, vehicle_brand, vehicle_purpose, is_guest, request_date)
 
-        await query.edit_message_text(text="Запрос принят и записан в базу данных.")
+        await query.edit_message_text(text="Запрос принят и записан в базу данных. Введите /start для возврата в главное меню")
     else:
         await query.edit_message_text(text="Запрос был отменен.")
 
     return ConversationHandler.END  # Завершаем разговор
 
-async def cancel_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.callback_query.message.reply_text('Введите /start для возврата в главное меню')
-    return MAIN_MENU
 
-    # Добавьте запрос на сохранение в базу данных здесь
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    cursor.execute('''
-        INSERT INTO requests (user_id, vehicle_number, vehicle_brand, is_guest, request_date, submission_date)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (update.effective_user.id, user_data['vehicle_number'], user_data['vehicle_brand'], user_data['is_guest'], user_data['request_date'], datetime.now()))
-    connection.commit()
-    connection.close()
-
-    return ConversationHandler.END

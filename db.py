@@ -22,6 +22,7 @@ def init_db():
             user_id INTEGER,
             vehicle_number TEXT,
             vehicle_brand TEXT,
+            vehicle_purpose TEXT,
             is_guest TEXT,
             request_date DATE,
             submission_date TIMESTAMP,
@@ -41,13 +42,13 @@ def add_user(user_id, name, phone, company, email):
     connection.commit()
     connection.close()
 
-def add_request(user_id, vehicle_number, vehicle_brand, is_guest, request_date):
+def add_request(user_id, vehicle_number, vehicle_brand, vehicle_purpose, is_guest, request_date):
     connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     cursor.execute('''
-        INSERT INTO requests (user_id, vehicle_number, vehicle_brand, is_guest, request_date, submission_date)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (user_id, vehicle_number, vehicle_brand, is_guest, request_date, datetime.now()))
+        INSERT INTO requests (user_id, vehicle_number, vehicle_brand, vehicle_purpose, is_guest, request_date, submission_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (user_id, vehicle_number, vehicle_brand, vehicle_purpose, is_guest, request_date, datetime.now()))
     connection.commit()
     connection.close()
 
